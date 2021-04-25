@@ -5,6 +5,8 @@ use crate::reader::{ReadInput};
 
 pub mod printer;
 pub mod reader;
+pub mod user_config;
+pub mod storage;
 
 pub struct Pickup<R, P>
 where
