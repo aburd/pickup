@@ -1,13 +1,15 @@
-use std::io;
-use std::collections::BTreeMap;
-use chrono::prelude::*;
 use crate::user_config::UserConfig;
+use log::{debug, trace};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::{self, Read};
 
-struct Item {
-    id: u64,
-    name: String,
-    obtained: bool,
-    created_at: DateTime<Utc>,
+#[derive(Serialize, Deserialize)]
+pub struct Item {
+    pub id: u64,
+    pub name: String,
+    pub obtained: bool,
+    pub created_at: String,
 }
 
 trait Store {
@@ -20,16 +22,24 @@ trait Store {
 }
 
 pub struct Storage {
-    items: BTreeMap<u64, Item>
+    items: Vec<Item>,
 }
 
 impl Storage {
-  pub fn new() -> Self {
-      Storage { items: BTreeMap::new() }
-  }
-  pub fn from_user_config(user_config: &UserConfig) -> io::Result<Self> {
-    unimplemented!();
-  }
+    pub fn new() -> Self {
+        Storage { items: Vec::new() }
+    }
+
+    pub fn from_user_config(user_config: &UserConfig) -> io::Result<Self> {
+        trace!("Creating store from user config...");
+        let mut file = fs::File::open(user_config.path.as_os_str())?;
+        let mut buf = String::new();
+        file.read_to_string(&mut buf)?;
+        let items: Vec<Item> = serde_json::from_str(&buf)?;
+
+        debug!("JSON file parsed. Adding storage...");
+        Ok(Storage { items })
+    }
 }
 
 impl Store for Storage {
@@ -53,6 +63,4 @@ impl Store for Storage {
     }
 }
 
-mod test {
-    
-}
+mod test {}
