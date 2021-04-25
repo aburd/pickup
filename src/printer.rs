@@ -43,4 +43,19 @@ mod test {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn writeln_works() {
+        let txt = "Make some noise!";
+        let mut writer = Vec::new();
+        let mut printer = Printer::new(&mut writer);
+
+        let result = printer.println(txt);
+        assert!(result.is_ok());
+
+        let actual = String::from_utf8(writer.clone()).expect("not utf8");
+        let expected = format!("{}\n", txt);
+
+        assert_eq!(actual, expected);
+    }
 }
