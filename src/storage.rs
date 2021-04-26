@@ -1,8 +1,7 @@
-use crate::user_config::UserConfig;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{self, PathBuf};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -14,31 +13,22 @@ pub struct Item {
 }
 
 trait Store {
-    fn load_items(&mut self) -> io::Result<()>;
-    fn persist_items(&self) -> io::Result<()>;
-    fn get_items(&self) -> Option<&Vec<Item>>;
-    fn get_item(&self, id: u64) -> Option<Item>;
+    fn persist_items(&self, items: &Vec<Item>) -> io::Result<()>;
+    fn get_items(&self) -> io::Result<Vec<Item>>;
+    fn get_item(&self, id: u64) -> io::Result<Item>;
     fn add_item(&mut self, item: Item) -> io::Result<()>;
     fn remove_item(&mut self, id: u64) -> io::Result<()>;
 }
 
-pub struct Storage {
+pub struct FileStorage {
     storage_path: PathBuf,
-    items: Vec<Item>,
 }
 
-impl Storage {
+impl FileStorage {
     pub fn new(storage_path: PathBuf) -> Self {
-        Storage {
+        FileStorage {
             storage_path,
-            items: Vec::new(),
         }
-    }
-
-    pub fn from_user_config(user_config: &UserConfig) -> io::Result<Self> {
-        let mut storage = Storage::new(user_config.path.clone());
-        storage.load_items()?;
-        Ok(storage)
     }
 
     fn storage_path(&self) -> io::Result<path::PathBuf> {
@@ -54,8 +44,8 @@ impl Storage {
     }
 }
 
-impl Store for Storage {
-    fn load_items(&mut self) -> io::Result<()> {
+impl Store for FileStorage {
+    fn get_items(&self) -> io::Result<Vec<Item>> {
         trace!("Getting store from user config...");
         let path = self.storage_path()?;
         let mut file = fs::File::open(path)?;
@@ -64,39 +54,40 @@ impl Store for Storage {
         let items: Vec<Item> = serde_json::from_str(&buf)?;
 
         debug!("JSON file parsed. Adding storage...");
-        self.items = items;
-        Ok(())
+        Ok(items)
     }
-    fn persist_items(&self) -> io::Result<()> {
+    fn persist_items(&self, items: &Vec<Item>) -> io::Result<()> {
         trace!("Persisting items to disk...");
         let path = self.storage_path()?;
-        let _file = fs::OpenOptions::new().write(true).open(path)?;
+        let mut file = fs::OpenOptions::new().write(true).open(path)?;
+        let buf = serde_json::to_string(items)?;
+        file.write(buf.as_bytes())?;
         Ok(())
     }
-    fn get_items(&self) -> Option<&Vec<Item>> {
-        if self.items.len() > 0 {
-            Some(&self.items)
-        } else {
-            None
-        }
-    }
-    fn get_item(&self, id: u64) -> Option<Item> {
-        for item in &self.items {
+    fn get_item(&self, id: u64) -> io::Result<Item> {
+        let items = self.get_items()?;
+        for item in items {
             if item.id == id {
-                return Some(item.clone());
+                return Ok(item);
             }
         }
-        None
+        Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Invalid path to storage file",
+        ))
+
     }
     fn add_item(&mut self, item: Item) -> io::Result<()> {
-        self.items.push(item);
-        self.persist_items()?;
+        let mut items = self.get_items()?;
+        items.push(item);
+        self.persist_items(&items)?;
         Ok(())
     }
     fn remove_item(&mut self, id: u64) -> io::Result<()> {
-        if let Some(pos) = self.items.iter().position(|i| i.id == id) {
-            self.items.remove(pos);
-            self.persist_items()?;
+        let mut items = self.get_items()?;
+        if let Some(pos) = items.iter().position(|i| i.id == id) {
+            items.remove(pos);
+            self.persist_items(&items)?;
             Ok(())
         } else {
             Err(io::Error::new(
@@ -107,4 +98,9 @@ impl Store for Storage {
     }
 }
 
-mod test {}
+mod test {
+    #[test]
+    fn test_getting_items() {
+
+    }
+}
