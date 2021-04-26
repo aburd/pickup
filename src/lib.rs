@@ -1,3 +1,5 @@
+extern crate dirs;
+
 use crate::printer::Print;
 use crate::reader::ReadInput;
 use log::{info, trace, warn};
