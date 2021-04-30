@@ -21,6 +21,8 @@ pub enum PickupCommand {
 #[derive(Debug)]
 pub struct PickupOpts {
     pub list_items: bool,
+    pub show_item: (bool, usize),
+    pub remove_item: (bool, usize),
 }
 
 pub struct Pickup<R, P, S>
@@ -47,21 +49,32 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
         trace!("Running pickup...");
         trace!("Loading items from config...");
         self.storage.load_items()?;
+        let cmds_from_opts = self.process_opts(opts);
 
-        let mut opts_passed = false;
-        debug!("Checking opts...");
-        debug!("Options {:?}", opts);
-        if opts.list_items {
-            opts_passed = true;
-            self.list_items()?;
-        }
-
-        if !opts_passed {
-            self.run_with_no_opts()?;
+        if cmds_from_opts.len() > 0 {
+            for cmd in cmds_from_opts {
+                self.process_command(cmd)?;
+            }
+        } else {
+            let _res = self.run_with_no_opts();
         }
 
         info!("Exiting.");
         Ok(())
+    }
+
+    fn process_opts(&mut self, opts: PickupOpts) -> Vec<PickupCommand> {
+        let mut cmds = vec![];
+        if opts.list_items {
+            cmds.push(PickupCommand::ListItems);
+        }
+        if opts.show_item.0 {
+            cmds.push(PickupCommand::ShowItem(opts.show_item.1));
+        }
+        if opts.remove_item.0 {
+            cmds.push(PickupCommand::RemoveItem(opts.remove_item.1));
+        }
+        cmds
     }
 
     fn get_command(&mut self) -> io::Result<PickupCommand> {
@@ -79,6 +92,15 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
             "exit" => Ok(PickupCommand::Exit),
             _ => Err(io::Error::new(io::ErrorKind::InvalidInput, "Invalid input")),
         }
+    }
+
+    fn print_options(&mut self) -> io::Result<()> {
+        self.printer.println("list: List items")?;
+        self.printer.println("item: Show item")?;
+        self.printer.println("remove: Remove item")?;
+        self.printer.println("exit: exit pickup")?;
+
+        Ok(())
     }
 
     fn get_id(&mut self) -> io::Result<usize> {
@@ -100,31 +122,47 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
 
     fn run_with_no_opts(&mut self) -> io::Result<()> {
         self.printer.println("What would you like to do?")?;
+        self.print_options()?;
         self.printer.print("> ")?;
 
         loop {
-            let command = self.get_command()?;
-            debug!("Got command: {:?}", command);
-
-            match command {
-                PickupCommand::ListItems => {
-                    self.list_items()?;
-                }
-                PickupCommand::ShowItem(id) => {
-                    let item = self.storage.get_item(id as u64)?;
-                    self.printer.println(&item.to_string())?;
-                }
-                PickupCommand::RemoveItem(id) => {
-                    self.storage.remove_item(id as u64)?;
-                    self.printer.println("Item removed.")?;
-                }
-                PickupCommand::Exit => {
+            if let Ok(command) = self.get_command() {
+                debug!("Got command: {:?}", command);
+            
+                let processed = self.process_command(command)?;
+                if !processed {
                     break;
                 }
+                
+                self.printer.println("")?;
+            } else {
+                self.printer.println("That was an invalid command.")?;
+                self.print_options()?;
             }
-            self.printer.println("")?;
         }
 
         Ok(())
+    }
+
+    fn process_command(&mut self, command: PickupCommand) -> io::Result<bool> {
+        match command {
+            PickupCommand::ListItems => {
+                self.list_items()?;
+                Ok(true)
+            }
+            PickupCommand::ShowItem(id) => {
+                let item = self.storage.get_item(id as u64)?;
+                self.printer.println(&item.to_string())?;
+                Ok(true)
+            }
+            PickupCommand::RemoveItem(id) => {
+                self.storage.remove_item(id as u64)?;
+                self.printer.println("Item removed.")?;
+                Ok(true)
+            }
+            PickupCommand::Exit => {
+                Ok(false)
+            }
+        }
     }
 }

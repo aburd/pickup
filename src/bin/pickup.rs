@@ -40,10 +40,23 @@ fn main() -> io::Result<()> {
                 .long("ls")
                 .help("List all the things you need to pickup"),
         )
+        .arg(
+            Arg::with_name("show item")
+                .short("s")
+                .long("show")
+                .takes_value(true)
+                .help("List all the things you need to pickup"),
+        )
         .get_matches();
 
     let opts = PickupOpts {
         list_items: matches.index_of("list").is_some(),
+        show_item: (matches.index_of("show item").is_some(), matches.value_of("show item").map_or(0, |val| {
+            val.parse::<usize>().unwrap()
+        })),
+        remove_item: (matches.index_of("show item").is_some(), matches.value_of("show item").map_or(0, |val| {
+            val.parse::<usize>().unwrap()
+        })),
     };
     pickup.run(opts)?;
 
