@@ -2,6 +2,7 @@ use dirs::home_dir;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::fmt;
 use std::io::{self, Read, Write};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -12,9 +13,17 @@ pub struct Item {
     pub created_at: String,
 }
 
+impl fmt::Display for &Item {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let obtained_s = if self.obtained { "[X]" } else { "[ ]" };
+        write!(f, "{}: {} {}", self.id, self.name, obtained_s)
+    }
+}
+
 pub trait Store {
     fn persist_items(&self) -> io::Result<()>;
     fn load_items(&mut self) -> io::Result<()>;
+    fn get_items(&self) -> io::Result<&Vec<Item>>;
     fn get_item(&self, id: u64) -> io::Result<&Item>;
     fn add_item(&mut self, item: Item) -> io::Result<()>;
     fn remove_item(&mut self, id: u64) -> io::Result<()>;
@@ -24,9 +33,15 @@ pub struct FileStorage {
     items: Vec<Item>,
 }
 
+impl Default for FileStorage {
+    fn default() -> Self {
+        Self { items: Vec::new() }
+    }
+}
+
 impl FileStorage {
     pub fn new() -> Self {
-        FileStorage { items: Vec::new() }
+        FileStorage::default()
     }
 
     fn json_file_path(&self) -> io::Result<String> {
@@ -38,6 +53,30 @@ impl FileStorage {
         home_dir()
             .map(|home| format!("{}/{}", home.display(), ".pickup"))
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+    }
+
+    pub fn config_dir_exists(&self) -> bool {
+        self.config_dir_path().and_then(fs::metadata).is_ok()
+    }
+
+    pub fn create_config_dir(&self) -> io::Result<()> {
+        if self.config_dir_exists() {
+            return Ok(())
+        }
+        fs::create_dir_all(self.config_dir_path()?)?;
+
+        Ok(())
+    }
+
+    pub fn items_file_exists(&self) -> bool {
+        self.json_file_path().and_then(fs::metadata).is_ok()
+    }   
+
+    pub fn create_items_file(&self) -> io::Result<()> {
+        if self.config_dir_exists() {
+            fs::File::create(self.json_file_path()?)?;
+        }
+        Ok(())
     }
 }
 
@@ -72,6 +111,9 @@ impl Store for FileStorage {
             io::ErrorKind::NotFound,
             "Invalid path to storage file",
         ))
+    }
+    fn get_items(&self) -> io::Result<&Vec<Item>> {
+        Ok(&self.items)
     }
     fn add_item(&mut self, item: Item) -> io::Result<()> {
         self.items.push(item);
