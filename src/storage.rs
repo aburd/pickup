@@ -1,10 +1,10 @@
+use dirs::home_dir;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::env;
+use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{self, PathBuf};
-use dirs::home_dir;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Item {
@@ -22,42 +22,22 @@ trait Store {
     fn remove_item(&mut self, id: u64) -> io::Result<()>;
 }
 
-pub struct FileStorage {
-    storage_path: PathBuf,
-}
+pub struct FileStorage {}
 
 impl FileStorage {
-    pub fn new() -> io::Result<Self> {
-        let home = env::var("HOME").unwrap();
-        FileStorage {
-            storage_path: ,
-        }
+    pub fn new() -> Self {
+        FileStorage {}
     }
 
-    pub fn from_path(storage_path: PathBuf) -> Self {
-        FileStorage {
-            storage_path,
-        }
-    }
-
-    fn storage_path(&self) -> io::Result<path::PathBuf> {
-        if let Some(path) = self.storage_path.to_str() {
-            let path = PathBuf::from(format!("{}/{}", path, "items.json"));
-            Ok(path)
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "Invalid path to storage file",
-            ))
-        }
+    fn json_file_path(&self) -> io::Result<path::PathBuf> {
+        let config_path = self.config_dir_path()?;
+        format!("{}/{}", config_path, "items.json")
     }
 
     fn config_dir_path(&self) -> io::Result<String> {
-        let n: i32 = 4;
-        let c = (n as u8) as char;
-        home_dir().map(|home| format!("{}/{}", home.display(), ".pickup")).ok_or_else(|| {
-
-        })
+        home_dir()
+            .map(|home| format!("{}/{}", home.display(), ".pickup"))
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
     }
 }
 
@@ -92,7 +72,6 @@ impl Store for FileStorage {
             io::ErrorKind::NotFound,
             "Invalid path to storage file",
         ))
-
     }
     fn add_item(&mut self, item: Item) -> io::Result<()> {
         let mut items = self.get_items()?;
@@ -116,12 +95,12 @@ impl Store for FileStorage {
 }
 
 mod test {
+    use super::*;
+    use std::env;
+    use std::fs::{self, File};
     use std::io;
     use std::path::PathBuf;
-    use std::fs::{self, File};
     use tempfile::TempDir;
-    use std::env;
-    use super::*;
 
     type TestResult = io::Result<()>;
 
@@ -156,7 +135,6 @@ mod test {
 
         Ok(())
     }
-
 
     fn test_get_items(f_storage: FileStorage) -> TestResult {
         let items = f_storage.get_items()?;
