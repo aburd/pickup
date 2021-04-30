@@ -92,31 +92,41 @@ impl Store for FileStorage {
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::FileStorage;
     use std::env;
-    use std::io;
+    use std::fs::{self, File};
+    use std::io::{self, Read, Write};
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
     #[test]
     fn test_config_path() -> TestResult {
-        let tmp_dir = set_config_dir()?;
         let storage = FileStorage::new();
+        let tmp_dir = set_config_dir()?;
 
         let actual = storage.config_dir_path()?;
-        let expected = format!("{}/{}", tmp_dir.path().display(), ".pickup");
+        let expected = tmp_dir
+            .path()
+            .join(".pickup")
+            .to_owned()
+            .into_os_string()
+            .into_string()
+            .unwrap();
 
         assert_eq!(actual, expected);
+        env::remove_var("HOME");
 
         Ok(())
     }
 
     #[test]
     fn test_json_file_path() -> TestResult {
-        let tmp_dir = set_config_dir()?;
         let storage = FileStorage::new();
+        let tmp_dir = set_config_dir()?;
 
         let actual = storage.json_file_path()?;
         let expected = format!(
@@ -127,6 +137,27 @@ mod test {
         );
 
         assert_eq!(actual, expected);
+        env::remove_var("HOME");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_file_storage() -> TestResult {
+        let tmp_dir = set_config_dir()?;
+        let storage = FileStorage::new();
+
+        let json_storage_buf = b"[{
+            \"id\": 1,
+            \"name\": \"foo item\",
+            \"obtained\": false,
+            \"created_at\": \"2021-04-30T05:23:39.821Z\",
+        }]";
+        let json_path = storage.json_file_path()?;
+
+        let mut f = fs::OpenOptions::new().read(true).write(true).create_new(true).open(json_path)?;
+        f.write_all(json_storage_buf)?;
+        env::remove_var("HOME");
 
         Ok(())
     }
@@ -134,6 +165,9 @@ mod test {
     fn set_config_dir() -> io::Result<TempDir> {
         let tmp_dir = TempDir::new()?;
         env::set_var("HOME", tmp_dir.path());
+        let config_dir = format!("{}/{}", tmp_dir.path().display(), ".pickup");
+
+        fs::create_dir_all(config_dir)?;
         Ok(tmp_dir)
     }
 }
