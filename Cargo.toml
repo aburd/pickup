@@ -5,6 +5,7 @@ authors = ["aaron"]
 edition = "2018"
 description = "A CLI tool that helps you remember to buy things"
 license = "GPL-3.0-only"
+homepage = "https://github.com/aburd/pickup"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
