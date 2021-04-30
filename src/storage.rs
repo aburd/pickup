@@ -1,10 +1,8 @@
 use dirs::home_dir;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::fs;
 use std::io::{self, Read, Write};
-use std::path::{self, PathBuf};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Item {
@@ -15,18 +13,20 @@ pub struct Item {
 }
 
 trait Store {
-    fn persist_items(&self, items: &Vec<Item>) -> io::Result<()>;
-    fn get_items(&self) -> io::Result<Vec<Item>>;
-    fn get_item(&self, id: u64) -> io::Result<Item>;
+    fn persist_items(&self) -> io::Result<()>;
+    fn load_items(&mut self) -> io::Result<()>;
+    fn get_item(&self, id: u64) -> io::Result<&Item>;
     fn add_item(&mut self, item: Item) -> io::Result<()>;
     fn remove_item(&mut self, id: u64) -> io::Result<()>;
 }
 
-pub struct FileStorage {}
+pub struct FileStorage {
+    items: Vec<Item>,
+}
 
 impl FileStorage {
     pub fn new() -> Self {
-        FileStorage {}
+        FileStorage { items: Vec::new() }
     }
 
     fn json_file_path(&self) -> io::Result<String> {
@@ -42,30 +42,30 @@ impl FileStorage {
 }
 
 impl Store for FileStorage {
-    fn get_items(&self) -> io::Result<Vec<Item>> {
+    fn load_items(&mut self) -> io::Result<()> {
         trace!("Getting store from user config...");
         let path = self.json_file_path()?;
         let mut file = fs::File::open(path)?;
         let mut buf = String::new();
         file.read_to_string(&mut buf)?;
         let items: Vec<Item> = serde_json::from_str(&buf)?;
+        self.items = items;
 
         debug!("JSON file parsed. Adding storage...");
-        Ok(items)
+        Ok(())
     }
-    fn persist_items(&self, items: &Vec<Item>) -> io::Result<()> {
+    fn persist_items(&self) -> io::Result<()> {
         trace!("Persisting items to disk...");
         let path = self.json_file_path()?;
         let mut file = fs::OpenOptions::new().write(true).open(path)?;
-        let buf = serde_json::to_string(items)?;
+        let buf = serde_json::to_string(&self.items)?;
         file.write(buf.as_bytes())?;
         Ok(())
     }
-    fn get_item(&self, id: u64) -> io::Result<Item> {
-        let items = self.get_items()?;
-        for item in items {
+    fn get_item(&self, id: u64) -> io::Result<&Item> {
+        for item in &self.items {
             if item.id == id {
-                return Ok(item);
+                return Ok(&item);
             }
         }
         Err(io::Error::new(
@@ -74,16 +74,14 @@ impl Store for FileStorage {
         ))
     }
     fn add_item(&mut self, item: Item) -> io::Result<()> {
-        let mut items = self.get_items()?;
-        items.push(item);
-        self.persist_items(&items)?;
+        self.items.push(item);
+        self.persist_items()?;
         Ok(())
     }
     fn remove_item(&mut self, id: u64) -> io::Result<()> {
-        let mut items = self.get_items()?;
-        if let Some(pos) = items.iter().position(|i| i.id == id) {
-            items.remove(pos);
-            self.persist_items(&items)?;
+        if let Some(pos) = self.items.iter().position(|i| i.id == id) {
+            self.items.remove(pos);
+            self.persist_items()?;
             Ok(())
         } else {
             Err(io::Error::new(
@@ -122,7 +120,12 @@ mod test {
         let storage = FileStorage::new();
 
         let actual = storage.json_file_path()?;
-        let expected = format!("{}/{}/{}", tmp_dir.path().display(), ".pickup", "items.json");
+        let expected = format!(
+            "{}/{}/{}",
+            tmp_dir.path().display(),
+            ".pickup",
+            "items.json"
+        );
 
         assert_eq!(actual, expected);
 
