@@ -89,7 +89,7 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
             "add" => {
                 let name = self.reader.read_input()?;
                 Ok(PickupCommand::AddItem(name))
-            },
+            }
             "list" | "ls" | "items" => Ok(PickupCommand::ListItems),
             "item" => {
                 let id = self.get_id()?;
@@ -133,18 +133,18 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
 
     fn run_with_no_opts(&mut self) -> io::Result<()> {
         self.printer.println("What would you like to do?")?;
-        self.print_options()?;
-        self.printer.print("> ")?;
 
         loop {
+            self.print_options()?;
+            self.printer.print("> ")?;
             if let Ok(command) = self.get_command() {
                 debug!("Got command: {:?}", command);
-            
+
                 let processed = self.process_command(command)?;
                 if !processed {
                     break;
                 }
-                
+
                 self.printer.println("")?;
             } else {
                 self.printer.println("That was an invalid command.")?;
@@ -175,12 +175,11 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
             }
             PickupCommand::RemoveItem(id) => {
                 let id = self.storage.remove_item(id as u64)?;
-                self.printer.println(&format!("Item with id {} removed.", id))?;
+                self.printer
+                    .println(&format!("Item with id {} removed.", id))?;
                 Ok(true)
             }
-            PickupCommand::Exit => {
-                Ok(false)
-            }
+            PickupCommand::Exit => Ok(false),
         }
     }
 }

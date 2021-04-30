@@ -96,7 +96,10 @@ impl Store for FileStorage {
     fn persist_items(&self) -> io::Result<()> {
         trace!("Persisting items to disk...");
         let path = self.json_file_path()?;
-        let mut file = fs::OpenOptions::new().write(true).truncate(true).open(path)?;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(path)?;
         let buf = serde_json::to_string(&self.items)?;
         file.write_all(buf.as_bytes())?;
         file.flush()?;

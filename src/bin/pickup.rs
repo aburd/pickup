@@ -65,13 +65,24 @@ fn main() -> io::Result<()> {
 
     let opts = PickupOpts {
         list_items: matches.index_of("list").is_some(),
-        show_item: (matches.index_of("show item").is_some(), matches.value_of("show item").map_or(0, |val| {
-            val.parse::<usize>().unwrap()
-        })),
-        remove_item: (matches.index_of("show item").is_some(), matches.value_of("remove item").map_or(0, |val| {
-            val.parse::<usize>().unwrap()
-        })),
-        add_item: (matches.index_of("add item").is_some(), matches.value_of("add item").map_or(String::new(), String::from)),
+        show_item: (
+            matches.index_of("show item").is_some(),
+            matches
+                .value_of("show item")
+                .map_or(0, |val| val.parse::<usize>().unwrap()),
+        ),
+        remove_item: (
+            matches.index_of("show item").is_some(),
+            matches
+                .value_of("remove item")
+                .map_or(0, |val| val.parse::<usize>().unwrap()),
+        ),
+        add_item: (
+            matches.index_of("add item").is_some(),
+            matches
+                .value_of("add item")
+                .map_or(String::new(), String::from),
+        ),
     };
     pickup.run(opts)?;
 
