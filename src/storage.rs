@@ -25,8 +25,8 @@ pub trait Store {
     fn load_items(&mut self) -> io::Result<()>;
     fn get_items(&self) -> io::Result<&Vec<Item>>;
     fn get_item(&self, id: u64) -> io::Result<&Item>;
-    fn add_item(&mut self, item: Item) -> io::Result<()>;
-    fn remove_item(&mut self, id: u64) -> io::Result<()>;
+    fn add_item(&mut self, name: String) -> io::Result<&Item>;
+    fn remove_item(&mut self, id: u64) -> io::Result<u64>;
 }
 
 pub struct FileStorage {
@@ -116,16 +116,25 @@ impl Store for FileStorage {
     fn get_items(&self) -> io::Result<&Vec<Item>> {
         Ok(&self.items)
     }
-    fn add_item(&mut self, item: Item) -> io::Result<()> {
+    fn add_item(&mut self, name: String) -> io::Result<&Item> {
+        let items = self.get_items()?;
+        let id = items.last().map(|i| i.id + 1).unwrap_or(1);
+        let now = chrono::Local::now();
+        let item = Item {
+            id,
+            name,
+            obtained: false,
+            created_at: now.to_rfc3339(),
+        };
         self.items.push(item);
         self.persist_items()?;
-        Ok(())
+        Ok(self.get_item(id)?)
     }
-    fn remove_item(&mut self, id: u64) -> io::Result<()> {
+    fn remove_item(&mut self, id: u64) -> io::Result<u64> {
         if let Some(pos) = self.items.iter().position(|i| i.id == id) {
             self.items.remove(pos);
             self.persist_items()?;
-            Ok(())
+            Ok(id)
         } else {
             Err(io::Error::new(
                 io::ErrorKind::NotFound,
@@ -200,14 +209,11 @@ mod test {
     fn test_add_item() -> TestResult {
         let (_tmp, mut storage) = storage_with_item()?;
         storage.load_items()?;
-        let item: Item = Item {
-            id: 2,
-            name: String::from("sup"),
-            obtained: true,
-            created_at: String::from("foo date"),
-        };
-        storage.add_item(item)?;
 
+        let item = storage.add_item(String::from("sup"))?;
+
+        assert!(item.id > 0);
+        assert_eq!(item.name, "sup");
         assert_eq!(storage.items.len(), 2);
 
         env::remove_var("HOME");
@@ -231,9 +237,10 @@ mod test {
     fn test_remove_item() -> TestResult {
         let (_tmp, mut storage) = storage_with_item()?;
         storage.load_items()?;
-        storage.remove_item(1)?;
+        let id = storage.remove_item(1)?;
 
         assert_eq!(storage.items.len(), 0);
+        assert_eq!(id, 1);
 
         env::remove_var("HOME");
         Ok(())

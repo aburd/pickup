@@ -45,7 +45,21 @@ fn main() -> io::Result<()> {
                 .short("s")
                 .long("show")
                 .takes_value(true)
-                .help("List all the things you need to pickup"),
+                .help("Show an item from your list"),
+        )
+        .arg(
+            Arg::with_name("remove item")
+                .short("r")
+                .long("remove")
+                .takes_value(true)
+                .help("Remove an item from your list"),
+        )
+        .arg(
+            Arg::with_name("add item")
+                .short("a")
+                .long("add")
+                .takes_value(true)
+                .help("Add something you need to pickup"),
         )
         .get_matches();
 
@@ -54,9 +68,10 @@ fn main() -> io::Result<()> {
         show_item: (matches.index_of("show item").is_some(), matches.value_of("show item").map_or(0, |val| {
             val.parse::<usize>().unwrap()
         })),
-        remove_item: (matches.index_of("show item").is_some(), matches.value_of("show item").map_or(0, |val| {
+        remove_item: (matches.index_of("show item").is_some(), matches.value_of("remove item").map_or(0, |val| {
             val.parse::<usize>().unwrap()
         })),
+        add_item: (matches.index_of("add item").is_some(), matches.value_of("add item").map_or(String::new(), String::from)),
     };
     pickup.run(opts)?;
 

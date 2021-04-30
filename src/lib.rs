@@ -13,6 +13,7 @@ pub mod storage;
 #[derive(Debug)]
 pub enum PickupCommand {
     ListItems,
+    AddItem(String),
     ShowItem(usize),
     RemoveItem(usize),
     Exit,
@@ -21,6 +22,7 @@ pub enum PickupCommand {
 #[derive(Debug)]
 pub struct PickupOpts {
     pub list_items: bool,
+    pub add_item: (bool, String),
     pub show_item: (bool, usize),
     pub remove_item: (bool, usize),
 }
@@ -64,7 +66,11 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
     }
 
     fn process_opts(&mut self, opts: PickupOpts) -> Vec<PickupCommand> {
+        debug!("Processing opts: {:?}", opts);
         let mut cmds = vec![];
+        if opts.add_item.0 {
+            cmds.push(PickupCommand::AddItem(opts.add_item.1));
+        }
         if opts.list_items {
             cmds.push(PickupCommand::ListItems);
         }
@@ -80,6 +86,10 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
     fn get_command(&mut self) -> io::Result<PickupCommand> {
         let user_input = self.reader.read_input()?;
         match user_input.as_str() {
+            "add" => {
+                let name = self.reader.read_input()?;
+                Ok(PickupCommand::AddItem(name))
+            },
             "list" | "ls" | "items" => Ok(PickupCommand::ListItems),
             "item" => {
                 let id = self.get_id()?;
@@ -95,6 +105,7 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
     }
 
     fn print_options(&mut self) -> io::Result<()> {
+        self.printer.println("add: Add item")?;
         self.printer.println("list: List items")?;
         self.printer.println("item: Show item")?;
         self.printer.println("remove: Remove item")?;
@@ -145,7 +156,14 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
     }
 
     fn process_command(&mut self, command: PickupCommand) -> io::Result<bool> {
+        debug!("Processing command: {:?}", command);
         match command {
+            PickupCommand::AddItem(name) => {
+                let item = self.storage.add_item(name)?;
+                self.printer.println("Added item")?;
+                self.printer.println(&item.to_string())?;
+                Ok(true)
+            }
             PickupCommand::ListItems => {
                 self.list_items()?;
                 Ok(true)
@@ -156,8 +174,8 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
                 Ok(true)
             }
             PickupCommand::RemoveItem(id) => {
-                self.storage.remove_item(id as u64)?;
-                self.printer.println("Item removed.")?;
+                let id = self.storage.remove_item(id as u64)?;
+                self.printer.println(&format!("Item with id {} removed.", id))?;
                 Ok(true)
             }
             PickupCommand::Exit => {
