@@ -1,8 +1,10 @@
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::env;
 use std::io::{self, Read, Write};
 use std::path::{self, PathBuf};
+use dirs::home_dir;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Item {
@@ -25,7 +27,14 @@ pub struct FileStorage {
 }
 
 impl FileStorage {
-    pub fn new(storage_path: PathBuf) -> Self {
+    pub fn new() -> io::Result<Self> {
+        let home = env::var("HOME").unwrap();
+        FileStorage {
+            storage_path: ,
+        }
+    }
+
+    pub fn from_path(storage_path: PathBuf) -> Self {
         FileStorage {
             storage_path,
         }
@@ -33,7 +42,7 @@ impl FileStorage {
 
     fn storage_path(&self) -> io::Result<path::PathBuf> {
         if let Some(path) = self.storage_path.to_str() {
-            let path = path::PathBuf::from(format!("{}/{}", path, "items.json"));
+            let path = PathBuf::from(format!("{}/{}", path, "items.json"));
             Ok(path)
         } else {
             Err(io::Error::new(
@@ -41,6 +50,14 @@ impl FileStorage {
                 "Invalid path to storage file",
             ))
         }
+    }
+
+    fn config_dir_path(&self) -> io::Result<String> {
+        let n: i32 = 4;
+        let c = (n as u8) as char;
+        home_dir().map(|home| format!("{}/{}", home.display(), ".pickup")).ok_or_else(|| {
+
+        })
     }
 }
 
@@ -99,8 +116,73 @@ impl Store for FileStorage {
 }
 
 mod test {
-    #[test]
-    fn test_getting_items() {
+    use std::io;
+    use std::path::PathBuf;
+    use std::fs::{self, File};
+    use tempfile::TempDir;
+    use std::env;
+    use super::*;
 
+    type TestResult = io::Result<()>;
+
+    #[test]
+    fn test_storage_path() -> TestResult {
+        let test_home_path = "/home/aaron";
+        let path = PathBuf::from(test_home_path);
+        let file_storage = FileStorage::new(path);
+
+        let s = format!("{}/{}", test_home_path, "items.json");
+        let expected = PathBuf::from(s);
+        let actual = file_storage.storage_path()?;
+
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    fn test_with_storage(func: &dyn Fn(FileStorage) -> TestResult) -> TestResult {
+        let mut file = File::create("test_file")?;
+
+        let item_json = b"[{\"id\": 1,
+        \"name\": \"ayano\",
+        \"obtained\": false,
+        \"created_at\": \"2021-04-26T15:38:04.341Z\"}]";
+
+        file.write(item_json)?;
+
+        let mut f_storage = FileStorage::new("test_file".into());
+
+        func(f_storage)?;
+        fs::remove_file("test_file")?;
+
+        Ok(())
+    }
+
+
+    fn test_get_items(f_storage: FileStorage) -> TestResult {
+        let items = f_storage.get_items()?;
+        assert_eq!(items.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_items_len() {
+        test_with_storage(&test_get_items).unwrap();
+    }
+
+    fn set_config_dir() -> io::Result<(PathBuf, TempDir)> {
+        let tmp_dir = TempDir::new()?;
+        let config_dir = tmp_dir.path().join(".pickup");
+
+        env::set_var("HOME", tmp_dir.path());
+
+        Ok((config_dir, tmp_dir))
+    }
+
+    fn set_and_create_config_dir() -> io::Result<(PathBuf, TempDir)> {
+        let (config_dir, tmp_dir) = set_config_dir()?;
+
+        fs::create_dir_all(&config_dir)?;
+
+        Ok((config_dir, tmp_dir))
     }
 }
