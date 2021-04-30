@@ -12,7 +12,7 @@ pub struct Item {
     pub created_at: String,
 }
 
-trait Store {
+pub trait Store {
     fn persist_items(&self) -> io::Result<()>;
     fn load_items(&mut self) -> io::Result<()>;
     fn get_item(&self, id: u64) -> io::Result<&Item>;
@@ -94,7 +94,7 @@ impl Store for FileStorage {
 
 #[cfg(test)]
 mod test {
-    use super::FileStorage;
+    use super::{FileStorage, Store, Item};
     use std::env;
     use std::fs::{self, File};
     use std::io::{self, Read, Write};
@@ -143,7 +143,60 @@ mod test {
     }
 
     #[test]
-    fn test_file_storage() -> TestResult {
+    fn test_load_items() -> TestResult {
+        let (_tmp, mut storage) = storage_with_item()?;
+        storage.load_items()?;
+
+        assert_eq!(storage.items.len(), 1);
+
+        env::remove_var("HOME");
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_item() -> TestResult {
+        let (_tmp, mut storage) = storage_with_item()?;
+        storage.load_items()?;
+        let item: Item = Item {
+            id: 2,
+            name: String::from("sup"),
+            obtained: true,
+            created_at: String::from("foo date"),
+        };
+        storage.add_item(item)?;
+
+        assert_eq!(storage.items.len(), 2);
+
+        env::remove_var("HOME");
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_item() -> TestResult {
+        let (_tmp, mut storage) = storage_with_item()?;
+        storage.load_items()?;
+        let item = storage.get_item(1)?;
+
+        assert_eq!(item.name, "foo item");
+        assert_eq!(item.obtained, false);
+
+        env::remove_var("HOME");
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_item() -> TestResult {
+        let (_tmp, mut storage) = storage_with_item()?;
+        storage.load_items()?;
+        storage.remove_item(1)?;
+
+        assert_eq!(storage.items.len(), 0);
+
+        env::remove_var("HOME");
+        Ok(())
+    }
+
+    fn storage_with_item() -> io::Result<(TempDir, FileStorage)> {
         let tmp_dir = set_config_dir()?;
         let storage = FileStorage::new();
 
@@ -151,15 +204,14 @@ mod test {
             \"id\": 1,
             \"name\": \"foo item\",
             \"obtained\": false,
-            \"created_at\": \"2021-04-30T05:23:39.821Z\",
+            \"created_at\": \"2021-04-30T05:23:39.821Z\"
         }]";
         let json_path = storage.json_file_path()?;
 
         let mut f = fs::OpenOptions::new().read(true).write(true).create_new(true).open(json_path)?;
         f.write_all(json_storage_buf)?;
-        env::remove_var("HOME");
 
-        Ok(())
+        Ok((tmp_dir, storage))
     }
 
     fn set_config_dir() -> io::Result<TempDir> {
