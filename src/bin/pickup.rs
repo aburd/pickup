@@ -1,8 +1,9 @@
+use clap::{App, Arg, SubCommand};
 use env_logger;
 use pickup::printer::Printer;
 use pickup::reader::Reader;
 use pickup::storage::FileStorage;
-use pickup::{Pickup, PickupOpts};
+use pickup::{Pickup, PickupCommand, PickupOpts};
 use std::io;
 
 fn main() -> io::Result<()> {
@@ -13,7 +14,6 @@ fn main() -> io::Result<()> {
     let stdout = io::stdout();
 
     let mut pickup = Pickup::new(Reader::new(stdin), Printer::new(stdout), FileStorage::new());
-    let opts = PickupOpts {};
 
     if !pickup.storage.config_dir_exists() {
         pickup.storage.create_config_dir()?;
@@ -22,6 +22,14 @@ fn main() -> io::Result<()> {
         pickup.storage.create_items_file()?;
     }
 
+    let matches = App::new("Pickup")
+        .version("0.1")
+        .author("Aaron Burdick")
+        .about("Helps you remember to pick things up")
+        .arg(Arg::with_name(""))
+        .get_matches();
+
+    let opts = PickupOpts {};
     pickup.run(opts)?;
 
     Ok(())

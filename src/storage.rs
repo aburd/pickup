@@ -1,8 +1,8 @@
 use dirs::home_dir;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::fmt;
+use std::fs;
 use std::io::{self, Read, Write};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -61,7 +61,7 @@ impl FileStorage {
 
     pub fn create_config_dir(&self) -> io::Result<()> {
         if self.config_dir_exists() {
-            return Ok(())
+            return Ok(());
         }
         fs::create_dir_all(self.config_dir_path()?)?;
 
@@ -70,7 +70,7 @@ impl FileStorage {
 
     pub fn items_file_exists(&self) -> bool {
         self.json_file_path().and_then(fs::metadata).is_ok()
-    }   
+    }
 
     pub fn create_items_file(&self) -> io::Result<()> {
         if self.config_dir_exists() {
@@ -136,7 +136,7 @@ impl Store for FileStorage {
 
 #[cfg(test)]
 mod test {
-    use super::{FileStorage, Store, Item};
+    use super::{FileStorage, Item, Store};
     use std::env;
     use std::fs::{self, File};
     use std::io::{self, Read, Write};
@@ -250,7 +250,11 @@ mod test {
         }]";
         let json_path = storage.json_file_path()?;
 
-        let mut f = fs::OpenOptions::new().read(true).write(true).create_new(true).open(json_path)?;
+        let mut f = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(json_path)?;
         f.write_all(json_storage_buf)?;
 
         Ok((tmp_dir, storage))

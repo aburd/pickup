@@ -18,7 +18,10 @@ impl<W: Write> Printer<W> {
 
 impl<W: Write> Print for Printer<W> {
     fn print(&mut self, text: &str) -> io::Result<()> {
-        write!(self.writer, "{}", text)
+        write!(self.writer, "{}", text);
+        self.writer.flush()?;
+        
+        Ok(())
     }
 
     fn println(&mut self, text: &str) -> io::Result<()> {

@@ -3,17 +3,23 @@ extern crate dirs;
 use crate::printer::Print;
 use crate::reader::ReadInput;
 use crate::storage::{FileStorage, Store};
-use log::{info, trace, warn};
+use log::{debug, info, trace};
 use std::io;
-use std::fmt::Display;
 
 pub mod printer;
 pub mod reader;
 pub mod storage;
 
-enum Command {
+#[derive(Debug)]
+pub enum PickupCommand {
     ShowItems,
+    ShowItem(usize),
+    RemoveItem(usize),
+    Exit,
 }
+
+#[derive(Debug)]
+pub struct PickupOpts {}
 
 pub struct Pickup<R, P, S>
 where
@@ -28,7 +34,11 @@ where
 
 impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
     pub fn new(reader: R, printer: P, storage: S) -> Self {
-        Pickup { reader, printer, storage }
+        Pickup {
+            reader,
+            printer,
+            storage,
+        }
     }
 
     pub fn run(&mut self, opts: PickupOpts) -> io::Result<()> {
@@ -36,42 +46,63 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
 
         trace!("Loading items from config...");
         self.storage.load_items()?;
+        self.printer.println("What would you like to do?")?;
+        self.printer.print("> ")?;
 
         loop {
-            self.print_options()?;
-            self.printer.print("> ")?;
-            if let Ok(cmd_d) = self.reader.read_input() {
-                self.printer.println("")?;
-                match cmd_d.as_str() {
-                    "show" => self.show_items()?,
-                    "exit" => {
-                        break;
+            let command = self.get_command()?;
+            debug!("Got command: {:?}", command);
+
+            match command {
+                PickupCommand::ShowItems => {
+                    let items = self.storage.get_items()?;
+                    for item in items {
+                        self.printer.println(&item.to_string())?;
                     }
-                    _ => (),
+                }
+                PickupCommand::ShowItem(id) => {
+                    let item = self.storage.get_item(id as u64)?;
+                    self.printer.println(&item.to_string())?;
+                }
+                PickupCommand::RemoveItem(id) => {
+                    self.storage.remove_item(id as u64)?;
+                    self.printer.println("Item removed.")?;
+                }
+                PickupCommand::Exit => {
+                    break;
                 }
             }
         }
+
+        self.printer.println("")?;
 
         info!("Exiting.");
         Ok(())
     }
 
-    fn show_items(&self) -> io::Result<()> {
-        let items = self.storage.get_items()?;
-        for item in items {
-            println!("{}", item);
+    fn get_command(&mut self) -> io::Result<PickupCommand> {
+        let user_input = self.reader.read_input()?;
+        match user_input.as_str() {
+            "items" => Ok(PickupCommand::ShowItems),
+            "item" => {
+                let id = self.get_id()?;
+                Ok(PickupCommand::ShowItem(id))
+            }
+            "remove" => {
+                let id = self.get_id()?;
+                Ok(PickupCommand::RemoveItem(id))
+            }
+            "exit" => Ok(PickupCommand::Exit),
+            _ => Err(io::Error::new(io::ErrorKind::InvalidInput, "Invalid input")),
         }
-
-        Ok(())
     }
 
-    fn print_options(&mut self) -> io::Result<()> {
-        self.printer.println("Select an option:")?;
-        self.printer.println("show: Show all my items to pickup")?;
-        self.printer.println("exit: Exit the program")?;
+    fn get_id(&mut self) -> io::Result<usize> {
+        self.printer.println("Which ID?")?;
+        self.printer.print(">")?;
 
-        Ok(())
+        let id_input = self.reader.read_input()?;
+        let id = id_input.parse::<usize>().unwrap();
+        Ok(id)
     }
 }
-
-pub struct PickupOpts {}
