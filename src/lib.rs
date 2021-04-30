@@ -2,7 +2,7 @@ extern crate dirs;
 
 use crate::printer::Print;
 use crate::reader::ReadInput;
-use crate::storage::{FileStorage, Store};
+use crate::storage::Store;
 use log::{debug, info, trace};
 use std::io;
 
@@ -12,14 +12,16 @@ pub mod storage;
 
 #[derive(Debug)]
 pub enum PickupCommand {
-    ShowItems,
+    ListItems,
     ShowItem(usize),
     RemoveItem(usize),
     Exit,
 }
 
 #[derive(Debug)]
-pub struct PickupOpts {}
+pub struct PickupOpts {
+    pub list_items: bool,
+}
 
 pub struct Pickup<R, P, S>
 where
@@ -43,38 +45,20 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
 
     pub fn run(&mut self, opts: PickupOpts) -> io::Result<()> {
         trace!("Running pickup...");
-
         trace!("Loading items from config...");
         self.storage.load_items()?;
-        self.printer.println("What would you like to do?")?;
-        self.printer.print("> ")?;
 
-        loop {
-            let command = self.get_command()?;
-            debug!("Got command: {:?}", command);
-
-            match command {
-                PickupCommand::ShowItems => {
-                    let items = self.storage.get_items()?;
-                    for item in items {
-                        self.printer.println(&item.to_string())?;
-                    }
-                }
-                PickupCommand::ShowItem(id) => {
-                    let item = self.storage.get_item(id as u64)?;
-                    self.printer.println(&item.to_string())?;
-                }
-                PickupCommand::RemoveItem(id) => {
-                    self.storage.remove_item(id as u64)?;
-                    self.printer.println("Item removed.")?;
-                }
-                PickupCommand::Exit => {
-                    break;
-                }
-            }
+        let mut opts_passed = false;
+        debug!("Checking opts...");
+        debug!("Options {:?}", opts);
+        if opts.list_items {
+            opts_passed = true;
+            self.list_items()?;
         }
 
-        self.printer.println("")?;
+        if !opts_passed {
+            self.run_with_no_opts()?;
+        }
 
         info!("Exiting.");
         Ok(())
@@ -83,7 +67,7 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
     fn get_command(&mut self) -> io::Result<PickupCommand> {
         let user_input = self.reader.read_input()?;
         match user_input.as_str() {
-            "items" => Ok(PickupCommand::ShowItems),
+            "list" | "ls" | "items" => Ok(PickupCommand::ListItems),
             "item" => {
                 let id = self.get_id()?;
                 Ok(PickupCommand::ShowItem(id))
@@ -104,5 +88,43 @@ impl<R: ReadInput, P: Print, S: Store> Pickup<R, P, S> {
         let id_input = self.reader.read_input()?;
         let id = id_input.parse::<usize>().unwrap();
         Ok(id)
+    }
+
+    fn list_items(&mut self) -> io::Result<()> {
+        let items = self.storage.get_items()?;
+        for item in items {
+            self.printer.println(&item.to_string())?;
+        }
+        Ok(())
+    }
+
+    fn run_with_no_opts(&mut self) -> io::Result<()> {
+        self.printer.println("What would you like to do?")?;
+        self.printer.print("> ")?;
+
+        loop {
+            let command = self.get_command()?;
+            debug!("Got command: {:?}", command);
+
+            match command {
+                PickupCommand::ListItems => {
+                    self.list_items()?;
+                }
+                PickupCommand::ShowItem(id) => {
+                    let item = self.storage.get_item(id as u64)?;
+                    self.printer.println(&item.to_string())?;
+                }
+                PickupCommand::RemoveItem(id) => {
+                    self.storage.remove_item(id as u64)?;
+                    self.printer.println("Item removed.")?;
+                }
+                PickupCommand::Exit => {
+                    break;
+                }
+            }
+            self.printer.println("")?;
+        }
+
+        Ok(())
     }
 }

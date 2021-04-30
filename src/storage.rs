@@ -44,12 +44,12 @@ impl FileStorage {
         FileStorage::default()
     }
 
-    fn json_file_path(&self) -> io::Result<String> {
+    pub fn json_file_path(&self) -> io::Result<String> {
         let config_path = self.config_dir_path()?;
         Ok(format!("{}/{}", config_path, "items.json"))
     }
 
-    fn config_dir_path(&self) -> io::Result<String> {
+    pub fn config_dir_path(&self) -> io::Result<String> {
         home_dir()
             .map(|home| format!("{}/{}", home.display(), ".pickup"))
             .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
