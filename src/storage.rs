@@ -59,7 +59,7 @@ impl Store for FileStorage {
         let path = self.json_file_path()?;
         let mut file = fs::OpenOptions::new().write(true).open(path)?;
         let buf = serde_json::to_string(&self.items)?;
-        file.write(buf.as_bytes())?;
+        file.write_all(buf.as_bytes())?;
         Ok(())
     }
     fn get_item(&self, id: u64) -> io::Result<&Item> {
@@ -93,14 +93,12 @@ impl Store for FileStorage {
 }
 
 mod test {
-    use super::*;
+    use super::FileStorage;
     use std::env;
-    use std::fs::{self, File};
     use std::io;
-    use std::path::PathBuf;
     use tempfile::TempDir;
 
-    type TestResult = io::Result<()>;
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
 
     #[test]
     fn test_config_path() -> TestResult {
@@ -115,6 +113,7 @@ mod test {
         Ok(())
     }
 
+    #[test]
     fn test_json_file_path() -> TestResult {
         let tmp_dir = set_config_dir()?;
         let storage = FileStorage::new();
