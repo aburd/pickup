@@ -1,9 +1,9 @@
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg};
 use env_logger;
 use pickup::printer::Printer;
 use pickup::reader::Reader;
 use pickup::storage::FileStorage;
-use pickup::{Pickup, PickupCommand, PickupOpts};
+use pickup::{Pickup, PickupOpts};
 use std::io;
 
 fn main() -> io::Result<()> {

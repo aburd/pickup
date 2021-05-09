@@ -5,7 +5,7 @@ use std::fmt;
 use std::fs;
 use std::io::{self, Read, Write};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Item {
     pub id: u64,
     pub name: String,
@@ -242,6 +242,7 @@ mod test {
         storage.load_items()?;
         let id = storage.remove_item(1)?;
 
+        println!("{:?}", storage.items);
         assert_eq!(storage.items.len(), 0);
         assert_eq!(id, 1);
 
